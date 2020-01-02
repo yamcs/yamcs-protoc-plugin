@@ -88,6 +88,7 @@ public class ServiceGenerator {
         // Uncomment when dropping java 8 (this annotation is only available as of java 9.
         jsource.addAnnotation("// @javax.annotation.processing.Generated(value = \"" + className + "\", date = \""
                 + Instant.now() + "\")");
+        jsource.addAnnotation("@SuppressWarnings(\"unchecked\")");
         jsource.addImport("com.google.protobuf.Message");
         jsource.addImport("com.google.protobuf.Descriptors.MethodDescriptor");
         jsource.addImport("com.google.protobuf.Descriptors.ServiceDescriptor");
@@ -112,9 +113,15 @@ public class ServiceGenerator {
             MethodBuilder msource = jsource.addMethod(javaMethodName);
             msource.setJavadoc(methodComments.get(method));
             msource.setAbstract(true);
-            msource.addArg("T", "ctx");
-            msource.addArg(inputType.getName(), "request");
-            msource.addArg("Observer<" + outputType.getName() + ">", "observer");
+            if (method.getClientStreaming()) {
+                msource.setReturn("Observer<" + inputType.getName() + ">");
+                msource.addArg("T", "ctx");
+                msource.addArg("Observer<" + outputType.getName() + ">", "observer");
+            } else {
+                msource.addArg("T", "ctx");
+                msource.addArg(inputType.getName(), "request");
+                msource.addArg("Observer<" + outputType.getName() + ">", "observer");
+            }
         }
 
         // Implement "ServiceDescriptor getDescriptorForType();"
@@ -169,7 +176,6 @@ public class ServiceGenerator {
         msource = jsource.addMethod("callMethod");
         msource.setFinal(true);
         msource.addAnnotation("@Override");
-        msource.addAnnotation("@SuppressWarnings(\"unchecked\")");
         msource.addArg("MethodDescriptor", "method");
         msource.addArg("T", "ctx");
         msource.addArg("Message", "request");
@@ -180,14 +186,43 @@ public class ServiceGenerator {
         msource.body().append("switch (method.getIndex()) {\n");
         for (int i = 0; i < service.getMethodCount(); i++) {
             MethodDescriptorProto method = service.getMethod(i);
-            String javaMethodName = Introspector.decapitalize(method.getName());
-            DescriptorProto inputType = messageTypes.get(method.getInputType().substring(1));
-            DescriptorProto outputType = messageTypes.get(method.getOutputType().substring(1));
-            String callArgs = "ctx, (" + inputType.getName() + ") request";
-            callArgs += ", (Observer<" + outputType.getName() + ">)(Object) future";
-            msource.body().append("case ").append(i).append(":\n");
-            msource.body().append("    ").append(javaMethodName).append("(").append(callArgs).append(");\n");
-            msource.body().append("    return;\n");
+            if (!method.getClientStreaming()) {
+                String javaMethodName = Introspector.decapitalize(method.getName());
+                DescriptorProto inputType = messageTypes.get(method.getInputType().substring(1));
+                DescriptorProto outputType = messageTypes.get(method.getOutputType().substring(1));
+                String callArgs = "ctx, (" + inputType.getName() + ") request";
+                callArgs += ", (Observer<" + outputType.getName() + ">)(Object) future";
+                msource.body().append("case ").append(i).append(":\n");
+                msource.body().append("    ").append(javaMethodName).append("(").append(callArgs).append(");\n");
+                msource.body().append("    return;\n");
+            }
+        }
+        msource.body().append("default:\n");
+        msource.body().append("    throw new IllegalStateException();\n");
+        msource.body().append("}\n");
+
+        // Implement "Observer<Message> callMethod(MethodDescriptor method, Observer<Message> observer)"
+        msource = jsource.addMethod("callMethod");
+        msource.setFinal(true);
+        msource.addAnnotation("@Override");
+        msource.setReturn("Observer<Message>");
+        msource.addArg("MethodDescriptor", "method");
+        msource.addArg("T", "ctx");
+        msource.addArg("Observer<Message>", "future");
+        msource.body().append("if (method.getService() != getDescriptorForType()) {\n");
+        msource.body().append("    throw new IllegalArgumentException(\"Method not contained by this service.\");\n");
+        msource.body().append("}\n");
+        msource.body().append("switch (method.getIndex()) {\n");
+        for (int i = 0; i < service.getMethodCount(); i++) {
+            MethodDescriptorProto method = service.getMethod(i);
+            if (method.getClientStreaming()) {
+                String javaMethodName = Introspector.decapitalize(method.getName());
+                DescriptorProto outputType = messageTypes.get(method.getOutputType().substring(1));
+                String callArgs = "ctx, (Observer<" + outputType.getName() + ">)(Object) future";
+                msource.body().append("case ").append(i).append(":\n");
+                msource.body().append("    return (Observer<Message>)(Object) ").append(javaMethodName).append("(")
+                        .append(callArgs).append(");\n");
+            }
         }
         msource.body().append("default:\n");
         msource.body().append("    throw new IllegalStateException();\n");
