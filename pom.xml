@@ -4,12 +4,12 @@
 
   <groupId>org.yamcs</groupId>
   <artifactId>yamcs-protoc-plugin</artifactId>
-  <version>5.0.1-SNAPSHOT</version>
+  <version>5.1.0</version>
   <packaging>jar</packaging>
   <name>Yamcs protoc plugin</name>
   <description>Generates additional outputs during Protobuf compilation</description>
 
-  <url>https://www.yamcs.org</url>
+  <url>https://yamcs.org</url>
 
   <scm>
     <url>https://github.com/yamcs/yamcs-protoc-plugin</url>
@@ -68,6 +68,11 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>3.1.0</version>
+          <configuration>
+            <!-- Adding the source fixes a javadoc bug in JDK11 -->
+            <source>1.8</source>
+            <author>false</author>
+          </configuration>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -90,6 +95,25 @@
   </distributionManagement>
 
   <profiles>
+    <profile>
+      <id>java8-compatibility</id>
+      <activation>
+        <jdk>[9,)</jdk>
+      </activation>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-compiler-plugin</artifactId>
+              <configuration>
+                <release>8</release>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
+    </profile>
     <profile>
       <id>release</id>
       <build>
