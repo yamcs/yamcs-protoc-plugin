@@ -21,6 +21,10 @@ public class SourceBuilder {
         this.class_ = class_;
     }
 
+    /**
+     * Sets Javadoc. But unlike Javadoc, this does not expect HTML input and so the input will be surrounded with
+     * &lt;pre&gt;&lt;/pre&gt; tags and escaped as necessary.
+     */
     public void setJavadoc(String javadoc) {
         this.javadoc = javadoc;
     }
@@ -113,7 +117,7 @@ public class SourceBuilder {
 
         if (javadoc != null) {
             buf.append("/**\n");
-            buf.append(" * ").append(javadoc.trim()).append("\n");
+            buf.append(generateJavadocBody(javadoc, " * "));
             buf.append(" */\n");
         }
 
@@ -136,7 +140,7 @@ public class SourceBuilder {
             buf.append("\n");
             if (method.javadoc != null) {
                 buf.append("    /**\n");
-                buf.append("     * ").append(method.javadoc.trim()).append("\n");
+                buf.append(generateJavadocBody(method.javadoc, "     * "));
                 buf.append("     */\n");
             }
             for (String annotation : method.annotations) {
@@ -178,5 +182,18 @@ public class SourceBuilder {
         }
 
         return buf.append("}\n").toString();
+    }
+
+    private static String generateJavadocBody(String raw, String prefix) {
+        String escaped = "<pre>\n" + raw.replace("@", "{@literal @}")
+                .replace("/*", "{@literal /}*")
+                .replace("*/", "*{@literal /}")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;") + "</pre>";
+        StringBuilder body = new StringBuilder();
+        for (String line : escaped.split("\n")) {
+            body.append(prefix).append(line).append("\n");
+        }
+        return body.toString();
     }
 }
