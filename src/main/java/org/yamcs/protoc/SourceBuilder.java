@@ -14,7 +14,11 @@ public class SourceBuilder {
     private boolean abstract_;
     private String javadoc;
     private String class_;
+    private String extends_;
     private String implements_;
+    private List<String> fieldTypes = new ArrayList<>();
+    private List<String> fieldNames = new ArrayList<>();
+    private List<ConstructorBuilder> constructors = new ArrayList<>();
     private List<MethodBuilder> methods = new ArrayList<>();
 
     public SourceBuilder(String class_) {
@@ -41,6 +45,10 @@ public class SourceBuilder {
         this.abstract_ = abstract_;
     }
 
+    public void setExtends(String extends_) {
+        this.extends_ = extends_;
+    }
+
     public void setImplements(String implements_) {
         this.implements_ = implements_;
     }
@@ -49,10 +57,37 @@ public class SourceBuilder {
         imports.add(import_);
     }
 
+    public void addField(String type, String name) {
+        fieldTypes.add(type);
+        fieldNames.add(name);
+    }
+
+    public ConstructorBuilder addConstructor() {
+        ConstructorBuilder constructor = new ConstructorBuilder();
+        constructors.add(constructor);
+        return constructor;
+    }
+
     public MethodBuilder addMethod(String name) {
         MethodBuilder method = new MethodBuilder(name);
         methods.add(method);
         return method;
+    }
+
+    public static class ConstructorBuilder {
+
+        private List<String> argTypes = new ArrayList<>();
+        private List<String> argNames = new ArrayList<>();
+        private StringBuilder body = new StringBuilder();
+
+        public void addArg(String type, String name) {
+            argTypes.add(type);
+            argNames.add(name);
+        }
+
+        public StringBuilder body() {
+            return body;
+        }
     }
 
     public static class MethodBuilder {
@@ -131,10 +166,40 @@ public class SourceBuilder {
         }
 
         buf.append(modifiers).append(" class ").append(class_);
+        if (extends_ != null) {
+            buf.append(" extends ").append(extends_);
+        }
         if (implements_ != null) {
             buf.append(" implements ").append(implements_);
         }
         buf.append(" {\n");
+
+        for (int i = 0; i < fieldTypes.size(); i++) {
+            buf.append("\n    private final ").append(fieldTypes.get(i)).append(" ").append(fieldNames.get(i))
+                    .append(";");
+        }
+        if (!fieldTypes.isEmpty()) {
+            buf.append("\n");
+        }
+
+        for (ConstructorBuilder constructor : constructors) {
+            buf.append("\n");
+            modifiers = "public";
+            buf.append("    ").append(modifiers).append(" ").append(class_);
+            buf.append("(");
+            for (int i = 0; i < constructor.argTypes.size(); i++) {
+                if (i > 0) {
+                    buf.append(", ");
+                }
+                buf.append(constructor.argTypes.get(i)).append(" ").append(constructor.argNames.get(i));
+            }
+            buf.append(") {\n");
+            String[] lines = constructor.body.toString().trim().split("\n");
+            for (int i = 0; i < lines.length; i++) {
+                buf.append("        ").append(lines[i]).append("\n");
+            }
+            buf.append("    }\n");
+        }
 
         for (MethodBuilder method : methods) {
             buf.append("\n");

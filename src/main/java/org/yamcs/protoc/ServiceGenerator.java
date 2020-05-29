@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.yamcs.protoc.SourceBuilder.ConstructorBuilder;
 import org.yamcs.protoc.SourceBuilder.MethodBuilder;
 
 import com.google.protobuf.DescriptorProtos.DescriptorProto;
@@ -68,10 +69,78 @@ public class ServiceGenerator {
         for (FileDescriptorProto file : request.getProtoFileList()) {
             for (int i = 0; i < file.getServiceCount(); i++) {
                 responseb.addFile(generateService(file, i));
+                responseb.addFile(generateServiceClient(file, i));
             }
         }
 
         responseb.build().writeTo(System.out);
+    }
+
+    private static File.Builder generateServiceClient(FileDescriptorProto file, int serviceIndex) {
+        ServiceDescriptorProto service = file.getService(serviceIndex);
+        String javaPackage = file.getOptions().getJavaPackage();
+        String javaName = service.getName() + "Client";
+
+        SourceBuilder jsource = new SourceBuilder(javaName);
+        jsource.setJavadoc(serviceComments.get(service));
+        jsource.setPackage(javaPackage);
+        jsource.setExtends("Abstract" + service.getName() + "<Void>");
+        jsource.addImport("org.yamcs.api.MethodHandler");
+        jsource.addImport("org.yamcs.api.Observer");
+        String className = ServiceGenerator.class.getName();
+        // Uncomment when dropping java 8 (this annotation is only available as of java 9.
+        jsource.addAnnotation("// @javax.annotation.processing.Generated(value = \"" + className + "\", date = \""
+                + Instant.now() + "\")");
+
+        jsource.addField("MethodHandler", "handler");
+
+        ConstructorBuilder csource = jsource.addConstructor();
+        csource.addArg("MethodHandler", "handler");
+        csource.body().append("this.handler = handler;");
+
+        for (int i = 0; i < service.getMethodCount(); i++) {
+            MethodDescriptorProto method = service.getMethod(i);
+            String javaMethodName = Introspector.decapitalize(method.getName());
+            DescriptorProto inputType = messageTypes.get(method.getInputType().substring(1));
+            DescriptorProto outputType = messageTypes.get(method.getOutputType().substring(1));
+
+            String inputTypeJavaPackage = getJavaPackage(inputType);
+            if (!inputTypeJavaPackage.equals(javaPackage)) {
+                jsource.addImport(getJavaClassname(inputType));
+            }
+
+            String outputTypeJavaPackage = getJavaPackage(outputType);
+            if (!outputTypeJavaPackage.equals(javaPackage)) {
+                jsource.addImport(getJavaClassname(outputType));
+            }
+
+            MethodBuilder msource = jsource.addMethod(javaMethodName);
+            msource.setJavadoc(methodComments.get(method));
+            msource.addAnnotation("@Override");
+            msource.setFinal(true);
+            if (method.getClientStreaming()) {
+                msource.setReturn("Observer<" + inputType.getName() + ">");
+                msource.addArg("Void", "ctx");
+                msource.addArg("Observer<" + outputType.getName() + ">", "observer");
+            } else {
+                msource.addArg("Void", "ctx");
+                msource.addArg(inputType.getName(), "request");
+                msource.addArg("Observer<" + outputType.getName() + ">", "observer");
+            }
+
+            if (method.getClientStreaming() || method.getServerStreaming()) {
+                msource.body().append("throw new UnsupportedOperationException();");
+            } else {
+                msource.body().append("handler.callMethod(\n");
+                msource.body().append("    getDescriptorForType().getMethods().get(").append(i).append("),\n");
+                msource.body().append("    request,\n");
+                msource.body().append("    ").append(outputType.getName()).append(".getDefaultInstance(),\n");
+                msource.body().append("    observer);");
+            }
+        }
+
+        String filename = javaPackage.replace('.', '/') + "/" + javaName + ".java";
+        return File.newBuilder().setName(filename).setContent(jsource.toString());
     }
 
     private static File.Builder generateService(FileDescriptorProto file, int serviceIndex) {
