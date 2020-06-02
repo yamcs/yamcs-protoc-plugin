@@ -128,7 +128,7 @@ public class ServiceGenerator {
                 msource.addArg("Observer<" + outputType.getName() + ">", "observer");
             }
 
-            if (method.getClientStreaming() || method.getServerStreaming()) {
+            if (method.getClientStreaming()) {
                 msource.body().append("throw new UnsupportedOperationException();");
             } else {
                 msource.body().append("handler.callMethod(\n");
