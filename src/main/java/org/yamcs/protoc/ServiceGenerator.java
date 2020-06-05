@@ -278,13 +278,14 @@ public class ServiceGenerator {
             msource.setFinal(true);
 
             if (method.getClientStreaming()) {
+                msource.addAnnotation("@SuppressWarnings(\"unchecked\")");
                 msource.setReturn("Observer<" + inputType.getName() + ">");
                 msource.addArg("Void", "ctx");
                 msource.addArg("Observer<" + outputType.getName() + ">", "observer");
                 msource.body()
                         .append("return (Observer<" + inputType.getName() + ">)(Object) handler.streamingCall(\n");
                 msource.body().append("    getDescriptorForType().getMethods().get(").append(i).append("),\n");
-                msource.body().append("    request,\n");
+                msource.body().append("    ").append(inputType.getName()).append(".getDefaultInstance(),\n");
                 msource.body().append("    ").append(outputType.getName()).append(".getDefaultInstance(),\n");
                 msource.body().append("    observer);");
             } else {
