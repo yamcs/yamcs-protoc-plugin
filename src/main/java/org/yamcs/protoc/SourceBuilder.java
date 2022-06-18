@@ -63,13 +63,13 @@ public class SourceBuilder {
     }
 
     public ConstructorBuilder addConstructor() {
-        ConstructorBuilder constructor = new ConstructorBuilder();
+        var constructor = new ConstructorBuilder();
         constructors.add(constructor);
         return constructor;
     }
 
     public MethodBuilder addMethod(String name) {
-        MethodBuilder method = new MethodBuilder(name);
+        var method = new MethodBuilder(name);
         methods.add(method);
         return method;
     }
@@ -138,12 +138,12 @@ public class SourceBuilder {
 
     @Override
     public String toString() {
-        StringBuilder buf = new StringBuilder();
+        var buf = new StringBuilder();
         buf.append("package ").append(package_).append(";\n\n");
 
-        List<String> sortedImports = new ArrayList<>(imports);
+        var sortedImports = new ArrayList<>(imports);
         Collections.sort(sortedImports);
-        for (String import_ : sortedImports) {
+        for (var import_ : sortedImports) {
             if (!import_.equals(package_)) {
                 buf.append("import ").append(import_).append(";\n");
             }
@@ -156,11 +156,11 @@ public class SourceBuilder {
             buf.append(" */\n");
         }
 
-        for (String annotation : annotations) {
+        for (var annotation : annotations) {
             buf.append(annotation).append("\n");
         }
 
-        String modifiers = "public";
+        var modifiers = "public";
         if (abstract_) {
             modifiers += " abstract";
         }
@@ -182,7 +182,7 @@ public class SourceBuilder {
             buf.append("\n");
         }
 
-        for (ConstructorBuilder constructor : constructors) {
+        for (var constructor : constructors) {
             buf.append("\n");
             modifiers = "public";
             buf.append("    ").append(modifiers).append(" ").append(class_);
@@ -194,21 +194,21 @@ public class SourceBuilder {
                 buf.append(constructor.argTypes.get(i)).append(" ").append(constructor.argNames.get(i));
             }
             buf.append(") {\n");
-            String[] lines = constructor.body.toString().trim().split("\n");
+            var lines = constructor.body.toString().trim().split("\n");
             for (int i = 0; i < lines.length; i++) {
                 buf.append("        ").append(lines[i]).append("\n");
             }
             buf.append("    }\n");
         }
 
-        for (MethodBuilder method : methods) {
+        for (var method : methods) {
             buf.append("\n");
             if (method.javadoc != null) {
                 buf.append("    /**\n");
                 buf.append(generateJavadocBody(method.javadoc, "     * "));
                 buf.append("     */\n");
             }
-            for (String annotation : method.annotations) {
+            for (var annotation : method.annotations) {
                 buf.append("    ").append(annotation).append("\n");
             }
             modifiers = "public";
@@ -238,7 +238,7 @@ public class SourceBuilder {
                     buf.append(method.argTypes.get(i)).append(" ").append(method.argNames.get(i));
                 }
                 buf.append(") {\n");
-                String[] lines = method.body.toString().trim().split("\n");
+                var lines = method.body.toString().trim().split("\n");
                 for (int i = 0; i < lines.length; i++) {
                     buf.append("        ").append(lines[i]).append("\n");
                 }
@@ -250,13 +250,13 @@ public class SourceBuilder {
     }
 
     private static String generateJavadocBody(String raw, String prefix) {
-        String escaped = "<pre>\n" + raw.replace("@", "{@literal @}")
+        var escaped = "<pre>\n" + raw.replace("@", "{@literal @}")
                 .replace("/*", "{@literal /}*")
                 .replace("*/", "*{@literal /}")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;") + "</pre>";
-        StringBuilder body = new StringBuilder();
-        for (String line : escaped.split("\n")) {
+        var body = new StringBuilder();
+        for (var line : escaped.split("\n")) {
             body.append(prefix).append(line).append("\n");
         }
         return body.toString();

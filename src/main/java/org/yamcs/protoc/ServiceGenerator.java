@@ -4,17 +4,12 @@ import java.beans.Introspector;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-
-import org.yamcs.protoc.SourceBuilder.ConstructorBuilder;
-import org.yamcs.protoc.SourceBuilder.MethodBuilder;
 
 import com.google.protobuf.DescriptorProtos.DescriptorProto;
 import com.google.protobuf.DescriptorProtos.FileDescriptorProto;
 import com.google.protobuf.DescriptorProtos.MethodDescriptorProto;
 import com.google.protobuf.DescriptorProtos.ServiceDescriptorProto;
-import com.google.protobuf.DescriptorProtos.SourceCodeInfo.Location;
 import com.google.protobuf.compiler.PluginProtos.CodeGeneratorRequest;
 import com.google.protobuf.compiler.PluginProtos.CodeGeneratorResponse;
 import com.google.protobuf.compiler.PluginProtos.CodeGeneratorResponse.File;
@@ -29,17 +24,17 @@ public class ServiceGenerator {
     private static Map<MethodDescriptorProto, String> methodComments = new HashMap<>();
 
     private static void scanComments(FileDescriptorProto file) {
-        List<ServiceDescriptorProto> services = file.getServiceList();
+        var services = file.getServiceList();
 
-        for (Location location : file.getSourceCodeInfo().getLocationList()) {
+        for (var location : file.getSourceCodeInfo().getLocationList()) {
             if (location.hasLeadingComments()) {
                 if (location.getPath(0) == FileDescriptorProto.SERVICE_FIELD_NUMBER) {
-                    ServiceDescriptorProto service = services.get(location.getPath(1));
+                    var service = services.get(location.getPath(1));
                     if (location.getPathCount() == 2) {
                         serviceComments.put(service, location.getLeadingComments());
                     } else if (location.getPathCount() == 4) {
                         if (location.getPath(2) == ServiceDescriptorProto.METHOD_FIELD_NUMBER) {
-                            MethodDescriptorProto method = service.getMethod(location.getPath(3));
+                            var method = service.getMethod(location.getPath(3));
                             methodComments.put(method, location.getLeadingComments());
                         }
                     }
@@ -49,24 +44,24 @@ public class ServiceGenerator {
     }
 
     public static void main(String[] args) throws IOException {
-        CodeGeneratorRequest request = CodeGeneratorRequest.parseFrom(System.in);
-        CodeGeneratorResponse.Builder responseb = CodeGeneratorResponse.newBuilder();
+        var request = CodeGeneratorRequest.parseFrom(System.in);
+        var responseb = CodeGeneratorResponse.newBuilder();
 
         // Index all messages by fully-qualified protobuf name
-        for (FileDescriptorProto file : request.getProtoFileList()) {
+        for (var file : request.getProtoFileList()) {
             scanComments(file);
 
-            String javaPackage = file.getOptions().getJavaPackage();
+            var javaPackage = file.getOptions().getJavaPackage();
             javaPackages.put(file.getName(), javaPackage);
 
-            for (DescriptorProto messageType : file.getMessageTypeList()) {
-                String qname = file.getPackage() + "." + messageType.getName();
+            for (var messageType : file.getMessageTypeList()) {
+                var qname = file.getPackage() + "." + messageType.getName();
                 messageTypes.put(qname, messageType);
                 fileForMessage.put(messageType, file);
             }
         }
 
-        for (FileDescriptorProto file : request.getProtoFileList()) {
+        for (var file : request.getProtoFileList()) {
             for (int i = 0; i < file.getServiceCount(); i++) {
                 responseb.addFile(generateService(file, i));
                 responseb.addFile(generateServiceClient(file, i));
@@ -77,18 +72,17 @@ public class ServiceGenerator {
     }
 
     private static File.Builder generateService(FileDescriptorProto file, int serviceIndex) {
-        ServiceDescriptorProto service = file.getService(serviceIndex);
-        String javaPackage = file.getOptions().getJavaPackage();
-        String javaName = "Abstract" + service.getName();
+        var service = file.getService(serviceIndex);
+        var javaPackage = file.getOptions().getJavaPackage();
+        var javaName = "Abstract" + service.getName();
 
-        SourceBuilder jsource = new SourceBuilder(javaName + "<T>");
+        var jsource = new SourceBuilder(javaName + "<T>");
         jsource.setAbstract(true);
         jsource.setJavadoc(serviceComments.get(service));
         jsource.setPackage(javaPackage);
         jsource.setImplements("Api<T>");
-        String className = ServiceGenerator.class.getName();
-        // Uncomment when dropping java 8 (this annotation is only available as of java 9.
-        jsource.addAnnotation("// @javax.annotation.processing.Generated(value = \"" + className + "\", date = \""
+        var className = ServiceGenerator.class.getName();
+        jsource.addAnnotation("@javax.annotation.processing.Generated(value = \"" + className + "\", date = \""
                 + Instant.now() + "\")");
         jsource.addAnnotation("@SuppressWarnings(\"unchecked\")");
         jsource.addImport("com.google.protobuf.Message");
@@ -97,22 +91,22 @@ public class ServiceGenerator {
         jsource.addImport("org.yamcs.api.Api");
         jsource.addImport("org.yamcs.api.Observer");
 
-        for (MethodDescriptorProto method : service.getMethodList()) {
-            String javaMethodName = Introspector.decapitalize(method.getName());
-            DescriptorProto inputType = messageTypes.get(method.getInputType().substring(1));
-            DescriptorProto outputType = messageTypes.get(method.getOutputType().substring(1));
+        for (var method : service.getMethodList()) {
+            var javaMethodName = Introspector.decapitalize(method.getName());
+            var inputType = messageTypes.get(method.getInputType().substring(1));
+            var outputType = messageTypes.get(method.getOutputType().substring(1));
 
-            String inputTypeJavaPackage = getJavaPackage(inputType);
+            var inputTypeJavaPackage = getJavaPackage(inputType);
             if (!inputTypeJavaPackage.equals(javaPackage)) {
                 jsource.addImport(getJavaClassname(inputType));
             }
 
-            String outputTypeJavaPackage = getJavaPackage(outputType);
+            var outputTypeJavaPackage = getJavaPackage(outputType);
             if (!outputTypeJavaPackage.equals(javaPackage)) {
                 jsource.addImport(getJavaClassname(outputType));
             }
 
-            MethodBuilder msource = jsource.addMethod(javaMethodName);
+            var msource = jsource.addMethod(javaMethodName);
             msource.setJavadoc(methodComments.get(method));
             msource.setAbstract(true);
             if (method.getClientStreaming()) {
@@ -127,7 +121,7 @@ public class ServiceGenerator {
         }
 
         // Implement "ServiceDescriptor getDescriptorForType();"
-        MethodBuilder msource = jsource.addMethod("getDescriptorForType");
+        var msource = jsource.addMethod("getDescriptorForType");
         msource.setReturn("ServiceDescriptor");
         msource.addAnnotation("@Override");
         msource.setFinal(true);
@@ -145,8 +139,8 @@ public class ServiceGenerator {
         msource.body().append("}\n");
         msource.body().append("switch (method.getIndex()) {\n");
         for (int i = 0; i < service.getMethodCount(); i++) {
-            MethodDescriptorProto method = service.getMethod(i);
-            DescriptorProto inputType = messageTypes.get(method.getInputType().substring(1));
+            var method = service.getMethod(i);
+            var inputType = messageTypes.get(method.getInputType().substring(1));
             msource.body().append("case ").append(i).append(":\n");
             msource.body().append("    return ").append(inputType.getName()).append(".getDefaultInstance();\n");
         }
@@ -165,8 +159,8 @@ public class ServiceGenerator {
         msource.body().append("}\n");
         msource.body().append("switch (method.getIndex()) {\n");
         for (int i = 0; i < service.getMethodCount(); i++) {
-            MethodDescriptorProto method = service.getMethod(i);
-            DescriptorProto outputType = messageTypes.get(method.getOutputType().substring(1));
+            var method = service.getMethod(i);
+            var outputType = messageTypes.get(method.getOutputType().substring(1));
             msource.body().append("case ").append(i).append(":\n");
             msource.body().append("    return ").append(outputType.getName()).append(".getDefaultInstance();\n");
         }
@@ -187,12 +181,12 @@ public class ServiceGenerator {
         msource.body().append("}\n");
         msource.body().append("switch (method.getIndex()) {\n");
         for (int i = 0; i < service.getMethodCount(); i++) {
-            MethodDescriptorProto method = service.getMethod(i);
+            var method = service.getMethod(i);
             if (!method.getClientStreaming()) {
-                String javaMethodName = Introspector.decapitalize(method.getName());
-                DescriptorProto inputType = messageTypes.get(method.getInputType().substring(1));
-                DescriptorProto outputType = messageTypes.get(method.getOutputType().substring(1));
-                String callArgs = "ctx, (" + inputType.getName() + ") request";
+                var javaMethodName = Introspector.decapitalize(method.getName());
+                var inputType = messageTypes.get(method.getInputType().substring(1));
+                var outputType = messageTypes.get(method.getOutputType().substring(1));
+                var callArgs = "ctx, (" + inputType.getName() + ") request";
                 callArgs += ", (Observer<" + outputType.getName() + ">)(Object) future";
                 msource.body().append("case ").append(i).append(":\n");
                 msource.body().append("    ").append(javaMethodName).append("(").append(callArgs).append(");\n");
@@ -216,11 +210,11 @@ public class ServiceGenerator {
         msource.body().append("}\n");
         msource.body().append("switch (method.getIndex()) {\n");
         for (int i = 0; i < service.getMethodCount(); i++) {
-            MethodDescriptorProto method = service.getMethod(i);
+            var method = service.getMethod(i);
             if (method.getClientStreaming()) {
-                String javaMethodName = Introspector.decapitalize(method.getName());
-                DescriptorProto outputType = messageTypes.get(method.getOutputType().substring(1));
-                String callArgs = "ctx, (Observer<" + outputType.getName() + ">)(Object) future";
+                var javaMethodName = Introspector.decapitalize(method.getName());
+                var outputType = messageTypes.get(method.getOutputType().substring(1));
+                var callArgs = "ctx, (Observer<" + outputType.getName() + ">)(Object) future";
                 msource.body().append("case ").append(i).append(":\n");
                 msource.body().append("    return (Observer<Message>)(Object) ").append(javaMethodName).append("(")
                         .append(callArgs).append(");\n");
@@ -230,49 +224,48 @@ public class ServiceGenerator {
         msource.body().append("    throw new IllegalStateException();\n");
         msource.body().append("}\n");
 
-        String filename = javaPackage.replace('.', '/') + "/" + javaName + ".java";
+        var filename = javaPackage.replace('.', '/') + "/" + javaName + ".java";
         return File.newBuilder().setName(filename).setContent(jsource.toString());
     }
 
     private static File.Builder generateServiceClient(FileDescriptorProto file, int serviceIndex) {
-        ServiceDescriptorProto service = file.getService(serviceIndex);
-        String javaPackage = file.getOptions().getJavaPackage();
-        String javaName = service.getName() + "Client";
+        var service = file.getService(serviceIndex);
+        var javaPackage = file.getOptions().getJavaPackage();
+        var javaName = service.getName() + "Client";
 
-        SourceBuilder jsource = new SourceBuilder(javaName);
+        var jsource = new SourceBuilder(javaName);
         jsource.setJavadoc(serviceComments.get(service));
         jsource.setPackage(javaPackage);
         jsource.setExtends("Abstract" + service.getName() + "<Void>");
         jsource.addImport("org.yamcs.api.MethodHandler");
         jsource.addImport("org.yamcs.api.Observer");
-        String className = ServiceGenerator.class.getName();
-        // Uncomment when dropping java 8 (this annotation is only available as of java 9.
-        jsource.addAnnotation("// @javax.annotation.processing.Generated(value = \"" + className + "\", date = \""
+        var className = ServiceGenerator.class.getName();
+        jsource.addAnnotation("@javax.annotation.processing.Generated(value = \"" + className + "\", date = \""
                 + Instant.now() + "\")");
 
         jsource.addField("MethodHandler", "handler");
 
-        ConstructorBuilder csource = jsource.addConstructor();
+        var csource = jsource.addConstructor();
         csource.addArg("MethodHandler", "handler");
         csource.body().append("this.handler = handler;");
 
         for (int i = 0; i < service.getMethodCount(); i++) {
-            MethodDescriptorProto method = service.getMethod(i);
-            String javaMethodName = Introspector.decapitalize(method.getName());
-            DescriptorProto inputType = messageTypes.get(method.getInputType().substring(1));
-            DescriptorProto outputType = messageTypes.get(method.getOutputType().substring(1));
+            var method = service.getMethod(i);
+            var javaMethodName = Introspector.decapitalize(method.getName());
+            var inputType = messageTypes.get(method.getInputType().substring(1));
+            var outputType = messageTypes.get(method.getOutputType().substring(1));
 
-            String inputTypeJavaPackage = getJavaPackage(inputType);
+            var inputTypeJavaPackage = getJavaPackage(inputType);
             if (!inputTypeJavaPackage.equals(javaPackage)) {
                 jsource.addImport(getJavaClassname(inputType));
             }
 
-            String outputTypeJavaPackage = getJavaPackage(outputType);
+            var outputTypeJavaPackage = getJavaPackage(outputType);
             if (!outputTypeJavaPackage.equals(javaPackage)) {
                 jsource.addImport(getJavaClassname(outputType));
             }
 
-            MethodBuilder msource = jsource.addMethod(javaMethodName);
+            var msource = jsource.addMethod(javaMethodName);
             msource.setJavadoc(methodComments.get(method));
             msource.addAnnotation("@Override");
             msource.setFinal(true);
@@ -301,16 +294,16 @@ public class ServiceGenerator {
             }
         }
 
-        String filename = javaPackage.replace('.', '/') + "/" + javaName + ".java";
+        var filename = javaPackage.replace('.', '/') + "/" + javaName + ".java";
         return File.newBuilder().setName(filename).setContent(jsource.toString());
     }
 
     private static String getJavaPackage(DescriptorProto messageType) {
-        FileDescriptorProto file = fileForMessage.get(messageType);
+        var file = fileForMessage.get(messageType);
         if (file.getOptions().getJavaMultipleFiles()) {
             return file.getOptions().getJavaPackage();
         } else {
-            String outerClassname = getOuterClassname(file);
+            var outerClassname = getOuterClassname(file);
             return file.getOptions().getJavaPackage() + "." + outerClassname;
         }
     }
@@ -319,7 +312,7 @@ public class ServiceGenerator {
         if (file.getOptions().hasJavaOuterClassname()) {
             return file.getOptions().getJavaOuterClassname();
         } else {
-            String name = new java.io.File(file.getName()).toPath().getFileName().toString().replace(".proto", "");
+            var name = new java.io.File(file.getName()).toPath().getFileName().toString().replace(".proto", "");
             return name.substring(0, 1).toUpperCase() + name.substring(1);
         }
     }

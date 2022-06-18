@@ -52,11 +52,10 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.0</version>
+          <version>3.8.1</version>
           <configuration>
             <encoding>${project.build.sourceEncoding}</encoding>
-            <source>1.8</source>
-            <target>1.8</target>
+            <release>11</release>
           </configuration>
         </plugin>
         <plugin>
@@ -67,10 +66,9 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>3.1.0</version>
+          <version>3.4.0</version>
           <configuration>
-            <!-- Adding the source fixes a javadoc bug in JDK11 -->
-            <source>1.8</source>
+            <release>11</release>
             <author>false</author>
           </configuration>
         </plugin>
@@ -95,25 +93,6 @@
   </distributionManagement>
 
   <profiles>
-    <profile>
-      <id>java8-compatibility</id>
-      <activation>
-        <jdk>[9,)</jdk>
-      </activation>
-      <build>
-        <pluginManagement>
-          <plugins>
-            <plugin>
-              <groupId>org.apache.maven.plugins</groupId>
-              <artifactId>maven-compiler-plugin</artifactId>
-              <configuration>
-                <release>8</release>
-              </configuration>
-            </plugin>
-          </plugins>
-        </pluginManagement>
-      </build>
-    </profile>
     <profile>
       <id>release</id>
       <build>
